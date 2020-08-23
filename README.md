@@ -1,4 +1,4 @@
-# RFCs and Specifications for I3
+# RFCs and Specifications for Indra3
 **IRC**s -- **I**ndra **R**equests for **C**omment.
 
 ### Contributing
