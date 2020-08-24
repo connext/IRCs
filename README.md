@@ -13,7 +13,7 @@ This proposed iteration of Connext extends [State Channels](https://statechannel
 
 ## Table of Contents
 ### Core
-1. [IRC-0: Base Protocol Background](https://github.com/connext/IRCs/blob/01-base-protocol-background/0-base-protocol-background.md) Background and JSON RPC Specification of StateChannels.
+1. [IRC-0: Base Protocol Background](https://github.com/connext/IRCs/blob/01-base-protocol-background/0-base-protocol-background.md) - Background and JSON RPC Specification of StateChannels.
 
 ## Contributing
 New IRCs must be submitted via PR by taking an issue from the TODOs below.
