@@ -1,4 +1,4 @@
-# IRC-01 Background on StateChannels Protocol
+# IRC-0 Background on StateChannels Protocol
 
 ## Overview
 State channels is a core protocol "engine" (they call it a `wallet) that validates and signs channel updates.
