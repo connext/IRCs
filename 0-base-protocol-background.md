@@ -26,7 +26,8 @@ Some terms and naming conventions have been changed in the new protocol:
 - **ParticipantId**: Unique identifier for a given participant. For now, this is the equivalent of `signerAddress`.
 
 ## Architecture
-// TODO
+Dependency graph of StateChannels modules:
+![alt text](https://github.com/connext/IRCs/blob/01-base-protocol-background/assets/IRC-0-SC-dependency.png?raw=true)
 
 ## JSON RPC Interface
 A rough specification of the JSON RPC interface [can be found here](https://github.com/connext/statechannels/blob/client-api-docs/packages/docs-website/docs/protocol-docs/client-specification/json-rpc-api.md). We can eventually move the WIP spec into this doc.
