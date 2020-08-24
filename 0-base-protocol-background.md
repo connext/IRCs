@@ -1,7 +1,7 @@
 # IRC-0 Background on StateChannels Protocol
 
 ## Overview
-State channels is a core protocol "engine" (they call it a `wallet) that validates and signs channel updates.
+State channels is a core protocol "engine" (they call it a `wallet`) that validates and signs channel updates.
 
 It is similar to our existing CFCore module in the following ways:
 1. The core "application" lifecycle of `propose`--> `install`--> `takeAction` --> `uninstall` is retained.
