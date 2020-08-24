@@ -3,7 +3,7 @@
 
 The files in this repository detail the protocol layers currently under development for the next iteration of Connext's state channel network. These specifications are a work in progress.
 
-We actively encourage pull requests and are looking to get as much community feedback as possible. Before submitting or commenting on a PR, please review Contributing below for some basic guidelines.
+We actively encourage pull requests and are looking to get as much community feedback as possible. Before submitting or commenting on a PR, please review [Contributing](https://github.com/connext/IRCs/blob/master/README.md#contributing) below for some basic guidelines.
 
 ## Intro
 
