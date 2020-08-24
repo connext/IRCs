@@ -18,6 +18,7 @@ Each IRC has a `finalization date` within which decisions regarding the IRC MUST
 
 TODOs:
 - [ ] **IRC-1** `Finalization date: Tues Aug 25th` -- Background specification of StateChannels wallet interface. Includes:
+    - JSON RPC interface for wallet
     - Spec of a `mock-wallet` which can be used for unit testing. 
     - Architecture diagram of StateChannels wallet internals.
     
