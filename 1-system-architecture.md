@@ -24,15 +24,14 @@ Note: this architecture implies that we will not add support for React-Native an
 Similar to how both our current `indra-node` and `rest-api-client` work, the `node` would store keys in a docker secret in the env and be responsible for managing them safely. It would also create a `ChannelSigner` with the same interface as what exists in the current implementation that would be injected into the StateChannels `server-wallet` for signing.
 
 ### Message-Router
-//TODO Should this be called `networking-service`?
-
 Message-router would be responsible for the following tasks:
 1. Pushing messages into the `server-wallet` (and getting corresponding outputs) using `pushMessage`
 2. Dispatching those messages to a recipient via some transport layer. For now, we will use [nats](https://nats.io) like in the existing implementation. Also note that we make some assumptions here about message addressing -- with nats, discovery and addressing are built in, but if we move to another transport eventually, we'd need to build these in.
 3. Authentication/encryption tasks related to the above.
 4. Listening to the `onNotification` event emitter and bubbling those events up to higher level modules. //TODO is this correct?
 5. Timing message responses and retrying if there is no response within the timeout.
-6. Filtering for duplicate messages -- the `server-wallet` may already handle this? //TODO
+6. Filtering for duplicate messages -- the `server-wallet` is already idempotent so this will mostly be catching and filtering errors correctly.
+7. Properly relaying error messages to the counterparty.
 
 ### Default-apps
 There are a set of default applications and actions we want to include as part of the core node stack. These apps represent a default set of utilities that should cover some or all of the basic needs of *most* implementers. Examples include simple transfers, async transfers, htlcs, top-ups, partial withdraws.
@@ -46,15 +45,13 @@ One major problem with the current structure of the `indra-node` is that there i
 The `node` API acts as a way to interact with one or many channels associated with the `node`s key(s). It should look very similar to the existing client API but with some more lower level functionality exposed. Doing this means that the `routing` portion of a `routing node` can sit entirely independently of the core implementation, and consume the exact same interface that the user would consume already. It also means we can iterate on rebalancing logic or even build entirely new tools like a node CLI without modifying any node code.
 
 ### Routing-Service
-//TODO Should this be called `forwarding-service`?
-
 The `routing-service` is responsible for turning a simple node (effectively what a client is today) into a `routing node` (indra-node or hub today). The `routing-service` listens to events bubbled up from `server-wallet`, and then takes actions on one or many channels to forward hashlocked transfers OR set up virtual channels.
 
 In the current implementation, this functionality is implemented in a combination of `transfer.service.ts`, `appActions.service.ts` and `appRegistry.service.ts`. Because we haven't implemented VCs, however, the process for adding support for new apps is still very high touch and modifies some of the core transfer flow.
 
-In the next iteration, we should utilize virtual channels for **all** current `requireOnline` flows. For now, the only transfer type where a recipient may be offline (which would not work with a virtual channel), would be the async transfer. We should limit hashlock-forwarding-based flows to **only** be for the async transfer for now.
-
-// TODO what needs to happen to support virtual channels?
+In the next iteration, we should utilize virtual channels for **all** current `requireOnline` flows. For now, the only transfer type where a recipient may be offline (which would not work with a virtual channel), would be the async transfer. We should limit hashlock-forwarding-based flows to **only** be for the async transfer for now. Because most of the logic for handling virtual channels will be implemented within the `server-wallet`, the routing-service will initially be fairly minimal in scope.
 
 ### Rebalancing-Service
-//TODO
+The `rebalancing-service` is responsible for constructing strategies (from simple default profiles to more sophisticated statistical modeling) to decide on how best to allocate funding within a channel. It will also interact directly with the node API to initiate interactions with the protocol and chain for deposit/withdraw actions.
+
+A critical blocker for the rebalancing service is support for top-ups and partial withdraws. Right now, this is still a WIP for the `server-wallet`.
