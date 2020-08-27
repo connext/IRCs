@@ -11,6 +11,10 @@ Connext is a state channel network - a p2p overlay network that sits on top of (
 
 This proposed iteration of Connext extends [State Channels](https://statechannels.org), a minimal, generalized framework for developing state channel applications.
 
+## Table of Contents
+### Core
+1. [IRC-0: Base Protocol Background](https://github.com/connext/IRCs/blob/01-base-protocol-background/0-base-protocol-background.md) - Background and JSON RPC Specification of StateChannels.
+
 ## Contributing
 New IRCs must be submitted via PR by taking an issue from the TODOs below.
 
@@ -18,6 +22,7 @@ Each IRC has a `finalization date` within which decisions regarding the IRC MUST
 
 TODOs:
 - [ ] **IRC-0** `Finalization date: Tues Aug 25th` -- Background specification of StateChannels wallet interface. Includes:
+    - JSON RPC interface for wallet
     - Spec of a `mock-wallet` which can be used for unit testing. 
     - Architecture diagram of StateChannels wallet internals.
     
