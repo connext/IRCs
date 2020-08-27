@@ -37,12 +37,40 @@ Dependency graph of StateChannels modules:
 ![alt text](https://github.com/connext/IRCs/blob/01-base-protocol-background/assets/IRC-0-SC-dependency.png?raw=true)
 
 Call flow:
-//TODO
+```
+      +--------------+                 +-----------------+
+      | Payer Wallet |                 | Receiver Wallet |
+      +-+-+----+-+---+                 +-+-+----+-+------+
+        ^ |    ^ |                       ^ |    ^ |
+        | |    | |                       | |    | |
+update  0 1    8 9 pushMessage    update 5 6    3 4 pushMessage
+Channel | |    | |               Channel | |    | |
+        | v    | v                       | v    | v
+      +-+-+----+-+---+                 +-+-+----+-+------+
+      |              +-------2-------->+                 |
+      | Payer Client |  POST /inbox    | Receiver Client |
+      |              +<------7---------+                 |
+      +--------------+                 +-----------------+
+```
+Where clients are implemented by us.
 
 ## JSON RPC Interface
 
-A rough specification of the JSON RPC interface [can be found here](https://github.com/connext/statechannels/blob/client-api-docs/packages/docs-website/docs/protocol-docs/client-specification/json-rpc-api.md). We can eventually move the WIP spec into this doc.
+A WIP specification of the JSON RPC interface [can be found here](https://github.com/connext/statechannels/blob/client-api-docs/packages/docs-website/docs/protocol-docs/client-specification/json-rpc-api.md). We can eventually move the WIP spec into this doc.
 
-## Wallet Interface
-
-// TODO: Finalize wallet interface
+## Missing Features
+Some core features are still being worked on in the `server-wallet` and will need to be completed before a Connext node built on StateChannels could be properly run and tested. Aside from finalizing the above JSON RPC schema, these are (in rough order of priority):
+- [ ] Support for ledger channel funding
+- [ ] Depositing into the channel
+- [ ] Defuning a channel on close
+- [ ] Top-ups + partial withdrawals
+- [ ] Support for virtual channels
+- [ ] Single ERC20 support
+- [ ] Deposit directly to an address instead of calling the contract method
+- [ ] Multiple ERC20 support
+- [ ] ChannelSigner support
+- [ ] ChainId cleanup (right now, all chainIds are hardcoded to `0x01`)
+- [ ] Protocol version number in messages (and corresponding error handling)
+- [ ] Store version number
+- [ ] Support for backup / restore from state
+- [ ] Migration path coordination from existing stack to StateChannels
