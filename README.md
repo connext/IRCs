@@ -26,3 +26,8 @@ TODOs:
     - Auth/encryption strategy
     - Connection to lower level wallet interface
     - Specification of message retries and failure cases
+- **IRC-3** -- Specification of Chain Watching/Transaction infra. Includes:
+    - Interface to StateChannels
+    - Discussion of environment agnosticism
+    - Historical state vs current state of chain
+    - Working with existing infra that's out there? (Graph, Any.sender)
