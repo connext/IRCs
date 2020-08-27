@@ -1,6 +1,6 @@
 # IRC-1 Indra System Architecture
 
-![alt text](https://github.com/connext/IRCs/blob/01-system-architecture/assets/IRC-1-architecture.png?raw=true)
+![alt text](https://github.com/connext/IRCs/blob/master/assets/IRC-1-architecture.png?raw=true)
 
 ## Moving to a Node-to-Node System
 
