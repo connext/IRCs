@@ -19,10 +19,8 @@ This proposed iteration of Connext extends [State Channels](https://statechannel
 ## Contributing
 New IRCs must be submitted via PR by taking an issue from the TODOs below.
 
-Each IRC has a `finalization date` within which decisions regarding the IRC MUST be finalized and the IRC PR, closed. Before this period, IRCs should be commented on in their respective PRs.
-
 TODOs:
-- **IRC-2** `Finalization date: Mon Aug 31` -- Specification of Message-Router and messaging infra. Includes:
+- **IRC-2** -- Specification of Message-Router and messaging infra. Includes:
     - Key decisions around transport
     - Message-router interface
     - Auth/encryption strategy
