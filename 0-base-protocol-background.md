@@ -34,7 +34,7 @@ Some terms and naming conventions have been changed in the new protocol:
 
 Dependency graph of StateChannels modules:
 
-![alt text](https://github.com/connext/IRCs/blob/01-base-protocol-background/assets/IRC-0-SC-dependency.png?raw=true)
+![alt text](https://github.com/connext/IRCs/blob/master/assets/IRC-0-SC-dependency.png?raw=true)
 
 Call flow:
 ```
