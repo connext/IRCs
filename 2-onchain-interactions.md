@@ -1,7 +1,5 @@
 # IRC-2 Onchain Interactions
 
-NOTE: Debatably should not be included in an IRC, this service implementation should live within the `@statechannels` repository. The main concern is other services need to be able to also access the data stored here, primarily the data around onchain transactions
-
 ## Overview
 
 Throughout the lifecycle of a channel there two major types of onchain interactions required:
@@ -104,10 +102,6 @@ event ChallengeCleared(
 
 This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
 
-QUESTIONS:
-
-- What happens if A (not turn taker) wants to withdraw funds (B is malicious). They would put state n-1 onchain with `forceMove`, and B would be free to call `respond` to clear the challenge. Is the `ChallengeCleared` event verbose enough for A to create a new state somehow? Is A expected to get the data B used from the calldata?
-
 ### Concluded
 
 The `Concluded` event is defined as:
@@ -138,15 +132,18 @@ To build iteratively, the implementation should be broken out into three phases:
 - **Phase 1**: stateful chain watching
 - **Phase 2**: lightweight, stateful chain watching with historical chain syncing (could include integration of outside tools, like a [subgraph](https://thegraph.com/docs/introduction#how-the-graph-works) or [dagger](https://github.com/maticnetwork/dagger.js))
 
-## Interface
+### Service Architecture
+
+![alt text](https://github.com/connext/IRCs/blob/master/assets/IRC-2-architecture.png?raw=true)
+
+### Interface
 
 ```typescript
 import { providers, Wallet } from "ethers";
 
 type OnchainServiceEnvironment = {
   provider: string | providers.JsonRpcProvider;
-  wallet: Wallet;
-  acceptableErrors?: string[]; // Allow channel wallet to define errors for retries
+  wallet: string | Wallet; // Private key or wallet to send tx
   maximumRetries?: number; // Maximum number of times a tx is retried
 };
 
@@ -163,8 +160,6 @@ type TransactionResult = providers.TransactionResponse & {
   completed: () => providers.TransactionReceipt & ContractEvent;
 };
 
-// TODO: why not make these the same as the contract event names where
-// applicable?
 type ChainEventName =
   | "fundsDeposited"
   | "fundsWithdrawn"
@@ -183,11 +178,6 @@ type ChainEvent = {
     data: ContractEvent;
   };
 };
-
-// TODO: finalize this! how aware of the wallet data structure is the onchain service expected to be?
-// instead, should this directly mirror the onchain state and be responsible for constructing the state representation
-// defined by the asset holder contracts instead?
-type ChainState = any;
 
 export interface IOnchainService {
   constructor(config: OnchainServiceEnvironment);
@@ -245,7 +235,7 @@ export interface IOnchainService {
    */
   public submitTransaction(
     tx: MinimumTransaction,
-    completionEvent: ChainEventName
+    reason: 'challenge' | 'deposit' | 'withdraw'
   ): Promise<TransactionResult>;
 
   /**
@@ -271,14 +261,5 @@ export interface IOnchainService {
     channelId: Bytes32,
     event?: ChainEvent
   ): Promise<ChainEvent[]>;
-
-  /**
-   * @description Retrieves all event records for a given channel
-   * @param channelId Unique channel identifier
-   * @returns All channel events
-   *
-   * @notice Not implemented in v0
-   */
-  public getChannelChainState(channelId: Bytes32): Promise<ChainState>;
 }
 ```
