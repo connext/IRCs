@@ -78,7 +78,7 @@ event Deposited(
 
 #### `NitroAdjudicator` emits `ChallengeRegistered`
 
-- This event is emitted at the end of the `foceMove` function in `NitroAdjudicator.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
+- This event is emitted at the end of the `forceMove` function in `NitroAdjudicator.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
 
 
 ```typescript
