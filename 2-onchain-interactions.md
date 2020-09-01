@@ -2,26 +2,25 @@
 
 ## Outstanding Questions
 
-- Best way to define wallet --> app --> service interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
+- Best way to define wallet --> app --> onchain interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
 
 ## Overview
 
-Throughout the lifecycle of a channel there two major types of onchain interactions required:
+Relevant contracts:
+ - [`AssetHolder`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IAssetHolder.sol) (in practice this will be an `EthAssetHolder` or `ERC20AssetHolder` or something else that implements IAssetHolder)
+ - [`ForceMove`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IForceMove.sol)
 
-- monitoring + storing contract events
-- sending transactions to chain (during adjudication, funding, withdrawing)
+The onchain service is responsible for:
+- Monitoring events for those relevant to a given set of channels (this set of channels is determined at {create,run?}-time)
+- Pushing relevant event information into the channel wallet
+- Persisting event information to some long-term storage
+- Broadcasting onchain actions
 
-Both of these functions are handled by an onchain service which has access to the channel wallet.
+When calling contract methods:
+- the channel wallet will be the one who holds a key for the channel account, signs channel states, and encodes them into the eth transaction data field.
+- the onchain service will be the one who holds a key for an eth account with gas money(?)
 
-### Design Requirements
-
-The onchain service must:
-
-- have the ability to register channels to monitor
-- monitor the chain for registered channel events
-- push event information to the channel wallet for registered channels
-- store information related to registered channel events
-- submit transactions to chain on behalf of registered channels
+The channel wallet & onchain service keys {can,should} (not?) be the same key..?
 
 ### Implementation Details
 
@@ -35,7 +34,75 @@ To build iteratively, the implementation should be broken out into three phases:
 
 ![alt text](https://github.com/connext/IRCs/blob/02-onchain-service/assets/IRC-2-architecture.png)
 
-### Interface
+### Contract Methods
+
+Throughout the lifecycle of a channel there a few types of onchain interactions that can be taken:
+
+- send funds into a channel via `AssetHolder.deposit(destination,expectedHeld,amount)`
+- transfer assets out of a channel via `AssetHolder.transferAll(channelId,allocation)` or `EthAssetHolder.claimAll(channelId,guarantee,allocation)`
+- create a new dispute via `NitroAdjudicator.forceMove(...)`
+- respond to a dispute via `NitroAdjudicator.respond(...)` or `NitroAdjudicator.checkpoint(...)`
+- conclude a dispute via `NitroAdjudicator.conclude(...)`
+- others..?
+
+### Contract Events
+
+There are also a few onchain events that need to be monitored:
+- `AssetHolder` emits `AssetTransferred` when transferring funds out of the channel. This event is emitted at the completion of the `transferAll` or `claimAll` functions in the `AssetHolder.sol`. The `transferAll` method is used to disburse funds from ledger or direct channels, while the `claimAll` method will disburse funds to the appropriate guarantor channel. In the process of removing funds from a channel, the state must be finalized between participants onchain using `pushOutcome` (finalization via adjudication) or `conclude` (happy case finalization). In practice, there are helper methods `pushOutcomeAndTransferAll` as well as `concludePushOutcomeAndTransferAll` that set the onchain state as well as transfer in one onchain transaction.
+
+```typescript
+event AssetTransferred(
+  bytes32 indexed channelId, // where funds are disbursed from
+  bytes32 indexed destination, // external address to wich funds were sent
+  uint256 amount // how many unit of given asset were transfered
+);
+```
+
+- `AssetHolder` emits `Deposited` when transferring funds into the channel. This event is emitted at the completion of the `deposit` function in both the `ERC20AssetHolder.sol` and the `ETHAssetHolder.sol` (which inherit the `AssetHolder.sol` contract). In the process of funding a channel, the funder must show their counterparty their intent to fund the channel. Both wallets will then expect a corresponding `Deposited` event to be emitted by the contracts before continuing with channel updates.
+
+```typescript
+event Deposited(
+  bytes32 indexed destination, // channelId to be credited
+  uint256 amountDeposited, // the amount that was credited to the channel
+  uint256 destinationHoldings // the channel balance post-deposit
+);
+```
+
+- `ForceMove` emits `ChallengeRegistered` when a new challenge is created. This event is emitted at the end of the `foceMove` function in `ForceMove.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
+
+
+```typescript
+event ChallengeRegistered(
+  bytes32 indexed channelId, // channelId to be adjudicated
+  uint48 turnNumRecord, // latest nonce
+  uint48 finalizesAt, // unix timestamp when challenge will finalize
+  address challenger, // address of participant who registered the challenge
+  bool isFinal, // whether challenge state is final
+  FixedPart fixedPart, // constant channel properties
+  ForceMoveApp.VariablePart[] variableParts, // variable channel properties
+  Signature[] sigs, // signatures of channel participants
+  uint8[] whoSignedWhat // information to relate signatures to participants
+);
+```
+
+- `ForceMove` emits `ChallengeCleared` when a challenge is responded to or a checkpoint is submitted.  This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
+
+```typescript
+event ChallengeCleared(
+  bytes32 indexed channelId, // channelId with existing adjudication
+  uint48 turnNumRecord // a nonce supported by channel participants
+);
+```
+
+- `ForceMove` emits `Concluded` once challenge outcome is finalized. This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
+
+```typescript
+event Concluded(
+  bytes32 indexed channelId, // channelId with finalized outcomes
+);
+```
+
+## Interface Proposal
 
 ```typescript
 import { providers, Wallet } from "ethers";
@@ -129,109 +196,3 @@ export interface IOnchainService {
   ): Promise<ChainEvent[]>;
 }
 ```
-
-## Protocol Events Background
-
-The statechannels protocol uses the following funding events defined in [`IAssetHolder.sol`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IAssetHolder.sol):
-
-- **AssetTransferred**: emitted when transferring funds out of the channel
-- **Deposited**: emitted when transferring funds into the channel
-
-as well as the following adjudication events defined in [`IForceMove.sol`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IForceMove.sol)
-
-- **ChallengeRegistered**: emitted when challenge is created or advanced to a higher nonce
-- **ChallengeCleared**: emitted when a challenge response or checkpoint occurs, and channel operations are resumed offchain
-- **Concluded**: emitted when outcomes are finalized
-
-### AssetTransferred
-
-The `AssetTransferred` event is defined as:
-
-```typescript
-event AssetTransferred(
-  // channelId funds were disbursed from
-  bytes32 indexed channelId,
-  // external address funds were sent to
-  bytes32 indexed destination,
-  // amount disbursed
-  uint256 amount
-);
-```
-
-This event is emitted at the completion of the `transferAll` or `claimAll` functions in the `AssetHolder.sol`. The `transferAll` method is used to disburse funds from ledger or direct channels, while the `claimAll` method will disburse funds to the appropriate guarantor channel. In the process of removing funds from a channel, the state must be finalized between participants onchain using `pushOutcome` (finalization via adjudication) or `conclude` (happy case finalization).
-
-In practice, there are helper methods `pushOutcomeAndTransferAll` as well as `concludePushOutcomeAndTransferAll` that set the onchain state as well as transfer in one onchain transaction.
-
-### Deposited
-
-The `Deposited` event is defined as:
-
-```typescript
-event Deposited(
-  // channelId to be credited
-  bytes32 indexed destination,
-  // the amount that was credited to the channel
-  uint256 amountDeposited,
-  // the channel balance post-deposit
-  uint256 destinationHoldings
-);
-```
-
-This event is emitted at the completion of the `deposit` function in both the `ERC20AssetHolder.sol` and the `ETHAssetHolder.sol` (which inherit the `AssetHolder.sol` contract). In the process of funding a channel, the funder must show their counterparty their intent to fund the channel. Both wallets will then expect a corresponding `Deposited` event to be emitted by the contracts before continuing with channel updates.
-
-### ChallengeRegistered
-
-The `ChallengeRegistered` event is defined as:
-
-```typescript
-event ChallengeRegistered(
-  // channelId to be adjudicated
-  bytes32 indexed channelId,
-  // latest nonce
-  uint48 turnNumRecord,
-  // unix timestamp when challenge will finalize
-  uint48 finalizesAt,
-  // address of participant who registered the challenge
-  address challenger,
-  // whether challenge state is final
-  bool isFinal,
-  // constant channel properties
-  FixedPart fixedPart,
-  // variable channel properties
-  ForceMoveApp.VariablePart[] variableParts,
-  // signatures of channel participants
-  Signature[] sigs,
-  // information to relate signatures to participants
-  uint8[] whoSignedWhat
-);
-```
-
-This event is emitted at the end of the `foceMove` function in `ForceMove.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
-
-### ChallengeCleared
-
-The `ChallengeCleared` event is defined as:
-
-```typescript
-event ChallengeCleared(
-  // channelId with existing adjudication
-  bytes32 indexed channelId,
-  // a nonce supported by channel participants
-  uint48 turnNumRecord
-);
-```
-
-This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
-
-### Concluded
-
-The `Concluded` event is defined as:
-
-```typescript
-event Concluded(
-  // channelId with finalized outcomes
-  bytes32 indexed channelId,
-);
-```
-
-This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
