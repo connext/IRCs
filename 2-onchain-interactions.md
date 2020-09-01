@@ -1,5 +1,9 @@
 # IRC-2 Onchain Interactions
 
+## Outstanding Questions
+
+- Best way to define wallet --> app --> service interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
+
 ## Overview
 
 Throughout the lifecycle of a channel there two major types of onchain interactions required:
@@ -7,7 +11,124 @@ Throughout the lifecycle of a channel there two major types of onchain interacti
 - monitoring + storing contract events
 - sending transactions to chain (during adjudication, funding, withdrawing)
 
-Both of these functions are handled by an onchain service, which the channel wallet has access to.
+Both of these functions are handled by an onchain service which has access to the channel wallet.
+
+### Design Requirements
+
+The onchain service must:
+
+- have the ability to register channels to monitor
+- monitor the chain for registered channel events
+- push event information to the channel wallet for registered channels
+- store information related to registered channel events
+- submit transactions to chain on behalf of registered channels
+
+### Implementation Details
+
+To build iteratively, the implementation should be broken out into three phases:
+
+- **Phase 0**: stateless chain watching and transaction sending
+- **Phase 1**: stateful chain watching
+- **Phase 2**: lightweight, stateful chain watching with historical chain syncing (could include integration of outside tools, like a [subgraph](https://thegraph.com/docs/introduction#how-the-graph-works) or [dagger](https://github.com/maticnetwork/dagger.js))
+
+### Service Architecture
+
+![alt text](https://github.com/connext/IRCs/blob/02-onchain-service/assets/IRC-2-architecture.png)
+
+### Interface
+
+```typescript
+import { providers, Wallet } from "ethers";
+
+type OnchainServiceEnvironment = {
+  provider: string | providers.JsonRpcProvider;
+  wallet: string | Wallet; // Private key or wallet to send tx
+  transactionRetries?: number; // Maximum number of times a tx is retried
+};
+
+type MinimumTransaction = {
+  to: Address;
+  value: Uint256;
+  data: string; // calldata
+};
+
+type AssetHolderInformation = {
+  assetId: Address;
+  contractAddress: Address;
+};
+
+export interface IOnchainService {
+  /**
+   * @description Create a new onchain service and begin syncing according to given env
+   * @param config The environment for the service
+   * @returns A newly started and syncing instance of the onchain service
+   *
+   * @notice if init code can be run synchronously use constructor, else make it private & use static method
+   * @notice Not implemented until v2, may not be implemented at all (mostly included as discussion)
+   */
+  constructor(config: OnchainServiceEnvironment);
+  public static create(
+    config: OnchainServiceEnvironment
+  ): Promise<IOnchainService>;
+
+  /**
+   * @description Stops all chain watchers and any other background services
+   * @returns {boolean} true if the operation succeeded
+   *
+   * @notice Not implemented until v2, depends on how historical syncing is done
+   * @notice see below for note about booleans
+   */
+  public stop(): Promise<boolean>;
+
+  /**
+   * @description Registers a channel for the onchain service to watch for.
+   * @param channelId Unique channel identifier
+   * @param assetHolders Asset holder contract addresses
+   */
+  public watchChannel(
+    channelId: Bytes32,
+    assetHolders: AssetHolderAddress[]
+  ): Promise<void>;
+
+  /**
+   * @description Submits a transaction to chain
+   * @param channelId Unique channel identifier
+   * @param tx Minimum transaction to send
+   * @returns A transaction result
+   *
+   * @notice Why do we need to provie a channelId?
+   */
+  public submitTransaction(
+    channelId: Bytes32,
+    tx: MinimumTransaction
+  ): Promise<TransactionResult>;
+
+  /**
+   * @description Retrieves the latest event of a given type for the provided channel
+   * @param channelId Unique channel identifier
+   * @returns The latest chain event if found, undefined otherwise
+   *
+   * @notice will this be useful for the channel wallet?
+   */
+  public getLatestEvent(
+    channelId: Bytes32,
+    event: ChainEvent
+  ): Promise<ChainEvent | undefined>;
+
+  /**
+   * @description Retrieves all event records for a given channel
+   * @param channelId Unique channel identifier
+   * @param event If provided, only returns events of a specific type for the channel (optional)
+   * @returns All channel events
+   *
+   * @notice Not implemented in v0
+   */
+  public getEvents(
+    channelId: Bytes32,
+    event?: ChainEvent
+  ): Promise<ChainEvent[]>;
+}
+```
 
 ## Protocol Events Background
 
@@ -114,121 +235,3 @@ event Concluded(
 ```
 
 This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
-
-## Design Requirements
-
-The onchain service must:
-
-- have the ability to register channels to monitor
-- monitor the chain for registered channel events
-- push event information to the channel wallet for registered channels
-- store information related to registered channel events
-- submit transactions to chain on behalf of registered channels
-
-### Implementation Details
-
-To build iteratively, the implementation should be broken out into three phases:
-
-- **Phase 0**: stateless chain watching and transaction sending
-- **Phase 1**: stateful chain watching
-- **Phase 2**: lightweight, stateful chain watching with historical chain syncing (could include integration of outside tools, like a [subgraph](https://thegraph.com/docs/introduction#how-the-graph-works) or [dagger](https://github.com/maticnetwork/dagger.js))
-
-### Service Architecture
-
-![alt text](https://github.com/connext/IRCs/blob/02-onchain-service/assets/IRC-2-architecture.png)
-
-### Interface
-
-```typescript
-import { providers, Wallet } from "ethers";
-
-type OnchainServiceEnvironment = {
-  provider: string | providers.JsonRpcProvider;
-  wallet: string | Wallet; // Private key or wallet to send tx
-  transactionRetries?: number; // Maximum number of times a tx is retried
-};
-
-type MinimumTransaction = {
-  to: Address;
-  value: Uint256;
-  data: string; // calldata
-};
-
-type AssetHolderInformation = {
-  assetId: Address;
-  contractAddress: Address;
-};
-
-export interface IOnchainService {
-  constructor(config: OnchainServiceEnvironment);
-
-  /**
-   * @description Static method to create and begin syncing an onchain service
-   * @param config The environment for the service
-   * @returns A newly started and syncing instance of the onchain service
-   *
-   * @notice Not implemented until v2, may not be implemented at all (mostly included as discussion)
-   */
-  public static start(
-    config: OnchainServiceEnvironment
-  ): Promise<IOnchainService>;
-
-  /**
-   * @description Stops the onchain service from monitoring the chain
-   * @returns A boolean indicating success
-   *
-   * @notice Not implemented until v2, depends on how historical syncing is done
-   */
-  // TODO: see below for note about booleans
-  public stop(): Promise<boolean>;
-
-  /**
-   * @description Registers a channel for the onchain service to watch for.
-   * @param channelId Unique channel identifier
-   * @param assetHolders Asset holder contract addresses
-   */
-  public registerChannel(
-    channelId: Bytes32,
-    assetHolders: AssetHolderAddress[]
-  ): Promise<void>;
-
-  /**
-   * @description Submits a transaction to chain
-   * @param channelId Unique channel identifier
-   * @param tx Minimum transaction to send
-   * @returns A transaction result
-   */
-  public submitTransaction(
-    channelId: Bytes32,
-    tx: MinimumTransaction
-  ): Promise<TransactionResult>;
-
-  /**
-   * @description Retrieves the latest event of a given type for the provided channel
-   * @param channelId Unique channel identifier
-   * @returns The latest chain event if found, undefined otherwise
-   */
-  // TODO: will this be useful for the channel wallet?
-  public getLatestEvent(
-    channelId: Bytes32,
-    event: ChainEvent
-  ): Promise<ChainEvent | undefined>;
-
-  /**
-   * @description Retrieves all event records for a given channel
-   * @param channelId Unique channel identifier
-   * @param event If provided, only returns events of a specific type for the channel (optional)
-   * @returns All channel events
-   *
-   * @notice Not implemented in v0
-   */
-  public getEvents(
-    channelId: Bytes32,
-    event?: ChainEvent
-  ): Promise<ChainEvent[]>;
-}
-```
-
-OUTSTANDING QUESTIONS:
-
-- Best way to define wallet --> app --> service interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
