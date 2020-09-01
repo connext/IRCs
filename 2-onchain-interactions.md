@@ -2,7 +2,13 @@
 
 ## Outstanding Questions
 
-- Best way to define wallet --> app --> onchain interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
+- Will the onchain service utilize a provided channel wallet? Or will the channel wallet utilize a provided onchain service?
+- Could the onchain service and the channel wallet have the same private key? Should they? If so, what's the best way to go about this?
+- What is the best way to define wallet --> app --> onchain interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)?
+- Should the wallet avoid double storing any data the chain service might store? For example, if there is a challenge in progress, should the wallet not store this data?
+- Does the browser wallet run a chain service? Or will the browser rely on an http server running a chain watcher?
+- Does retry-on-certain-errors really require any user-provided constructor args? Ideally we'll be able to make reasonable assumptions w/out requiring anything from the user (eg always retry if nonce error & never retry if insufficient funds).
+- What are the pros/cons of giving the onchain service a `registerChannel(channelId)` method vs providing a `channelId` in the constructor? Are there any cases where we'd want to start watching arbitrary channel ids after the onchain service has been created?
 
 ## Overview
 
