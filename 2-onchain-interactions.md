@@ -119,10 +119,11 @@ This event is emitted at the end of the `conclude` as well as the `concludePushO
 
 The onchain service must:
 
-- monitor the chain for channel events
-- push event information to the channel wallet for relevant channels
-- store information related to relevant channel events
-- send transactions with sent to the service from the channel wallet
+- have the ability to register channels to monitor
+- monitor the chain for registered channel events
+- push event information to the channel wallet for registered channels
+- store information related to registered channel events
+- submit transactions to chain on behalf of registered channels
 
 ### Implementation Details
 
@@ -144,7 +145,7 @@ import { providers, Wallet } from "ethers";
 type OnchainServiceEnvironment = {
   provider: string | providers.JsonRpcProvider;
   wallet: string | Wallet; // Private key or wallet to send tx
-  maximumRetries?: number; // Maximum number of times a tx is retried
+  transactionRetries?: number; // Maximum number of times a tx is retried
 };
 
 type MinimumTransaction = {
@@ -153,30 +154,9 @@ type MinimumTransaction = {
   data: string; // calldata
 };
 
-type TransactionResult = providers.TransactionResponse & {
-  // TODO: this type of callback is useful if you need to wait not
-  // only for the transaction but also for some other transaction
-  // related asynchronous behavior (i.e. writing event data to storage)
-  completed: () => providers.TransactionReceipt & ContractEvent;
-};
-
-type ChainEventName =
-  | "fundsDeposited"
-  | "fundsWithdrawn"
-  | "transactionMined"
-  | "forceMoveDetected"
-  | "checkpointDetected"
-  | "concludeDetected"
-  | "respondDetected";
-
-type ChainEvent = {
-  channelId: Bytes32;
-  event: {
-    type: ChainEventName;
-    // Example data type
-    // https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/src/contract/asset-holder.ts#L5
-    data: ContractEvent;
-  };
+type AssetHolderInformation = {
+  assetId: Address;
+  contractAddress: Address;
 };
 
 export interface IOnchainService {
@@ -203,39 +183,24 @@ export interface IOnchainService {
   public stop(): Promise<boolean>;
 
   /**
-   * @description Connects the wallet to the given provider
-   * @param provider The provider to connect to
-   * @returns The updated service
-   */
-  public connect(
-    provider: string | providers.JsonRpcProvider
-  ): Promise<IOnchainService>;
-
-  /**
    * @description Registers a channel for the onchain service to watch for.
    * @param channelId Unique channel identifier
    * @param assetHolders Asset holder contract addresses
-   * @returns boolean value indicating if registration was successful
    */
-  // TODO: booleans for success are rarely very informative, since you get little
-  // insight into why the failure happened. I would suggest returning a string value
-  // instead
   public registerChannel(
     channelId: Bytes32,
     assetHolders: AssetHolderAddress[]
-  ): Promise<boolean>;
+  ): Promise<void>;
 
   /**
    * @description Submits a transaction to chain
+   * @param channelId Unique channel identifier
    * @param tx Minimum transaction to send
-   * @param completionEvent An event you expect to be emitted when the transaction can be
-   * considered "completed" from the POV of the chain wallet (i.e. all data stored, see TODO
-   * above if this is even necessary)
    * @returns A transaction result
    */
   public submitTransaction(
-    tx: MinimumTransaction,
-    reason: 'challenge' | 'deposit' | 'withdraw'
+    channelId: Bytes32,
+    tx: MinimumTransaction
   ): Promise<TransactionResult>;
 
   /**
@@ -263,3 +228,7 @@ export interface IOnchainService {
   ): Promise<ChainEvent[]>;
 }
 ```
+
+OUTSTANDING QUESTIONS:
+
+- Best way to define wallet --> app --> service interaction (i.e. define a `TransactionPending` outbox type for the message router to handle)
