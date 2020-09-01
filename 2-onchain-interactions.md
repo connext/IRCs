@@ -43,12 +43,17 @@ Throughout the lifecycle of a channel there a few types of onchain interactions 
 - create a new dispute via `NitroAdjudicator.forceMove(...)`
 - respond to a dispute via `NitroAdjudicator.respond(...)` or `NitroAdjudicator.checkpoint(...)`
 - conclude a dispute via `NitroAdjudicator.conclude(...)`
+- Registry the results of a dispute on the asset holder via `NitroAdjudicator.pushOutcome(...)`
+- helpers: perform 2 of the above actions at once with methods like `pushOutcomeAndTransferAll` or `concludePushOutcomeAndTransferAll`
 - others..?
 
 ### Contract Events
 
-There are also a few onchain events that need to be monitored:
-- `AssetHolder` emits `AssetTransferred` when transferring funds out of the channel. This event is emitted at the completion of the `transferAll` or `claimAll` functions in the `AssetHolder.sol`. The `transferAll` method is used to disburse funds from ledger or direct channels, while the `claimAll` method will disburse funds to the appropriate guarantor channel. In the process of removing funds from a channel, the state must be finalized between participants onchain using `pushOutcome` (finalization via adjudication) or `conclude` (happy case finalization). In practice, there are helper methods `pushOutcomeAndTransferAll` as well as `concludePushOutcomeAndTransferAll` that set the onchain state as well as transfer in one onchain transaction.
+#### `AssetHolder` -> `AssetTransferred`
+
+This event is emitted at the completion of the `transferAll` or `claimAll` functions in `AssetHolder.sol`. The `transferAll` method is used to disburse funds from ledger or direct channels, while the `claimAll` method will disburse funds to the appropriate guarantor channel. In the process of removing funds from a channel, the state must be finalized between participants onchain using `pushOutcome` (finalization via adjudication) or `conclude` (happy case finalization).
+
+In practice, there are helper methods `pushOutcomeAndTransferAll` as well as `concludePushOutcomeAndTransferAll` that set the onchain state as well as transfer in one onchain transaction.
 
 ```typescript
 event AssetTransferred(
@@ -58,7 +63,9 @@ event AssetTransferred(
 );
 ```
 
-- `AssetHolder` emits `Deposited` when transferring funds into the channel. This event is emitted at the completion of the `deposit` function in both the `ERC20AssetHolder.sol` and the `ETHAssetHolder.sol` (which inherit the `AssetHolder.sol` contract). In the process of funding a channel, the funder must show their counterparty their intent to fund the channel. Both wallets will then expect a corresponding `Deposited` event to be emitted by the contracts before continuing with channel updates.
+#### `AssetHolder` -> `Deposited`
+
+- This event is emitted at the completion of the `deposit` function in both the `ERC20AssetHolder.sol` and the `ETHAssetHolder.sol` (which inherit the `AssetHolder.sol` contract). In the process of funding a channel, the funder must show their counterparty their intent to fund the channel. Both wallets will then expect a corresponding `Deposited` event to be emitted by the contracts before continuing with channel updates.
 
 ```typescript
 event Deposited(
@@ -68,7 +75,9 @@ event Deposited(
 );
 ```
 
-- `ForceMove` emits `ChallengeRegistered` when a new challenge is created. This event is emitted at the end of the `foceMove` function in `ForceMove.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
+#### `ForceMove` -> `ChallengeRegistered`
+
+- This event is emitted at the end of the `foceMove` function in `ForceMove.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
 
 
 ```typescript
@@ -85,7 +94,9 @@ event ChallengeRegistered(
 );
 ```
 
-- `ForceMove` emits `ChallengeCleared` when a challenge is responded to or a checkpoint is submitted.  This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
+#### `ForceMove` -> `ChallengeCleared`
+
+- This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
 
 ```typescript
 event ChallengeCleared(
@@ -93,8 +104,9 @@ event ChallengeCleared(
   uint48 turnNumRecord // a nonce supported by channel participants
 );
 ```
+#### `ForceMove` -> `Concluded`
 
-- `ForceMove` emits `Concluded` once challenge outcome is finalized. This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
+This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
 
 ```typescript
 event Concluded(
