@@ -9,6 +9,7 @@
 Relevant contracts:
  - [`AssetHolder`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IAssetHolder.sol) (in practice this will be an `EthAssetHolder` or `ERC20AssetHolder` or something else that implements IAssetHolder)
  - [`ForceMove`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IForceMove.sol)
+ - [`NitroAdjudicator`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/NitroAdjudicator.sol) (extends ForceMove)
 
 The onchain service is responsible for:
 - Monitoring events for those relevant to a given set of channels (this set of channels is determined at {create,run?}-time)
@@ -49,7 +50,7 @@ Throughout the lifecycle of a channel there a few types of onchain interactions 
 
 ### Contract Events
 
-#### `AssetHolder` -> `AssetTransferred`
+#### `AssetHolder` emits `AssetTransferred`
 
 This event is emitted at the completion of the `transferAll` or `claimAll` functions in `AssetHolder.sol`. The `transferAll` method is used to disburse funds from ledger or direct channels, while the `claimAll` method will disburse funds to the appropriate guarantor channel. In the process of removing funds from a channel, the state must be finalized between participants onchain using `pushOutcome` (finalization via adjudication) or `conclude` (happy case finalization).
 
@@ -63,7 +64,7 @@ event AssetTransferred(
 );
 ```
 
-#### `AssetHolder` -> `Deposited`
+#### `AssetHolder` emits `Deposited`
 
 - This event is emitted at the completion of the `deposit` function in both the `ERC20AssetHolder.sol` and the `ETHAssetHolder.sol` (which inherit the `AssetHolder.sol` contract). In the process of funding a channel, the funder must show their counterparty their intent to fund the channel. Both wallets will then expect a corresponding `Deposited` event to be emitted by the contracts before continuing with channel updates.
 
@@ -75,9 +76,9 @@ event Deposited(
 );
 ```
 
-#### `ForceMove` -> `ChallengeRegistered`
+#### `NitroAdjudicator` emits `ChallengeRegistered`
 
-- This event is emitted at the end of the `foceMove` function in `ForceMove.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
+- This event is emitted at the end of the `foceMove` function in `NitroAdjudicator.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
 
 
 ```typescript
@@ -94,7 +95,7 @@ event ChallengeRegistered(
 );
 ```
 
-#### `ForceMove` -> `ChallengeCleared`
+#### `NitroAdjudicator` emits `ChallengeCleared`
 
 - This event is emitted at the end of the `respond` and `checkpoint` functions in `ForceMove.sol`. When in a challenge, users can choose to resume channel operations offchain by calling either function depending on the signatures on the state. When calling `respond` only need a single turn taker's signature on a higher nonced state is required to clear a challenge, whereas when calling `checkpoint` requires a state signed by all channel participants. Calling either of these functions will set everything except the `turnNum` in the challenge record to empty values.
 
@@ -104,7 +105,7 @@ event ChallengeCleared(
   uint48 turnNumRecord // a nonce supported by channel participants
 );
 ```
-#### `ForceMove` -> `Concluded`
+#### `NitroAdjudicator` emits `Concluded`
 
 This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
 
@@ -119,21 +120,23 @@ event Concluded(
 ```typescript
 import { providers, Wallet } from "ethers";
 
+type AssetHolderInformation = {
+  assetId: Address; // AddressZero for EthAssetHolder?
+  contractAddress: Address;
+};
+
+// Q: Should we have one OnchainService per chain or give OnchainService a set of providers keyed by chainId?
 type OnchainServiceEnvironment = {
   provider: string | providers.JsonRpcProvider;
   wallet: string | Wallet; // Private key or wallet to send tx
-  transactionRetries?: number; // Maximum number of times a tx is retried
+  nitroAdjudicatorAddress: string;
+  assetHolders: AssetHolderInformation[];
 };
 
 type MinimumTransaction = {
   to: Address;
   value: Uint256;
-  data: string; // calldata
-};
-
-type AssetHolderInformation = {
-  assetId: Address;
-  contractAddress: Address;
+  data: string; // calldata encoded by the channel wallet
 };
 
 export interface IOnchainService {
