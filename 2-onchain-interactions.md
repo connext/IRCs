@@ -127,56 +127,72 @@ event Concluded(
 ## Interface Proposal
 
 ```typescript
+import { Address, Bytes32, Uint256 } from "@statechannels/client-api-schema";
 import { providers, Wallet } from "ethers";
 
-type AssetHolderInformation = {
-  assetId: Address; // AddressZero for EthAssetHolder?
-  contractAddress: Address;
-};
+// Configuraiton for the onchain service, all values have defaults
+// if not provided
+export type OnchainServiceConfiguration = Partial<{
+  transactionAttempts: number; // Maximum number of times a tx is retried
+}>;
 
-// Q: Should we have one OnchainService per chain or give OnchainService a set of providers keyed by chainId?
-type OnchainServiceEnvironment = {
-  provider: string | providers.JsonRpcProvider;
-  wallet: string | Wallet; // Private key or wallet to send tx
-  nitroAdjudicatorAddress: string;
-  assetHolders: AssetHolderInformation[];
-};
+// This is used instead of the ethers `Transaction` because that type
+// requires the nonce and chain ID to be specified, when sometimes those
+// arguments are not known at the time of creating a transaction.
+export type MinimalTransaction = Pick<
+  providers.TransactionRequest,
+  "chainId" | "to" | "data" | "value"
+>;
 
-type MinimumTransaction = {
-  to: Address;
-  value: Uint256;
-  data: string; // calldata encoded by the channel wallet
-};
+// Options (like retry, delay, gas multiple, etc) for the transaction send
+// attempt
+export type TransactionSubmissionOptions = Partial<{
+  maxSendAttempts: number;
+}>;
+
+// An injectable service responsible for sending transactions to chain.
+// Designed to be used so the OnchainServiceInterface can "set it and forget it"
+export interface TransactionSubmissionServiceInterface {
+
+  /**
+   * @description Creates a new transaction submission service
+   * @param provider RPC Url or a JSON RPC Provider
+   * @param wallet Wallet or private key to send transactions from
+   */
+  constructor(provider: string | providers.JsonRpcProvider, wallet: string | Wallet);
+  /**
+   * @description Sends a transaction to chain
+   * @param minTx Transaction to submit
+   * @param options Transaction configuration options
+   */
+  submitTransaction(
+    minTx: MinimalTransaction,
+    options?: TransactionSubmissionOptions
+  ): Promise<providers.TransactionResponse>;
+}
 
 export interface IOnchainService {
   /**
    * @description Create a new onchain service and begin syncing according to given env
-   * @param config The environment for the service
+   * @param provider RPC Url or a JSON RPC Provider
+   * @param transactionSubmissionService Implements ITransactionSubmissionService
    * @returns A newly started and syncing instance of the onchain service
    *
-   * @notice if init code can be run synchronously use constructor, else make it private & use static method
+   * @notice if init code can be run synchronously use constructor, else make it private & use static method (i.e. `create`)
    * @notice Not implemented until v2, may not be implemented at all (mostly included as discussion)
    */
-  constructor(config: OnchainServiceEnvironment);
-  public static create(
-    config: OnchainServiceEnvironment
-  ): Promise<IOnchainService>;
-
-  /**
-   * @description Stops all chain watchers and any other background services
-   * @returns {boolean} true if the operation succeeded
-   *
-   * @notice Not implemented until v2, depends on how historical syncing is done
-   * @notice see below for note about booleans
-   */
-  public stop(): Promise<boolean>;
+  constructor(
+    provider: string | providers.JsonRpcProvider,
+    transactionSubmissionService: TransactionSubmissionServiceInterface,
+    config: OnchainServiceConfiguration = {}
+  );
 
   /**
    * @description Registers a channel for the onchain service to watch for.
    * @param channelId Unique channel identifier
    * @param assetHolders Asset holder contract addresses
    */
-  public watchChannel(
+  public registerChannel(
     channelId: Bytes32,
     assetHolders: AssetHolderAddress[]
   ): Promise<void>;
@@ -185,21 +201,30 @@ export interface IOnchainService {
    * @description Submits a transaction to chain
    * @param channelId Unique channel identifier
    * @param tx Minimum transaction to send
-   * @returns A transaction result
+   * @returns A transaction response
    *
-   * @notice Why do we need to provie a channelId?
+   * @notice Why do we need to provie a channelId? (for storage purposes, would be useful to know)
    */
   public submitTransaction(
     channelId: Bytes32,
     tx: MinimumTransaction
-  ): Promise<TransactionResult>;
+  ): Promise<providers.TransactionResponse>;
+
+  /**
+   * @description Associates a channel wallet with the service, allowing the onchain service to
+   * execute the required callback following an event for a registered channel
+   * @param wallet The channel wallet instance
+   * @returns void
+   *
+   * @notice Should we remove in V1? (See questions section)
+   */
+  public attachChannelWallet(wallet: ChannelWallet): void
 
   /**
    * @description Retrieves the latest event of a given type for the provided channel
    * @param channelId Unique channel identifier
    * @returns The latest chain event if found, undefined otherwise
    *
-   * @notice will this be useful for the channel wallet?
    */
   public getLatestEvent(
     channelId: Bytes32,
@@ -220,3 +245,9 @@ export interface IOnchainService {
   ): Promise<ChainEvent[]>;
 }
 ```
+
+## Questions
+
+- Should we have one `OnchainService` per chain or give `OnchainService` a set of providers keyed by chainId?
+- Should the `OnchainService` have a concept of a channel wallet? Or should it accept any channel through `registerChannel` and allow the application to handle service <--> wallet communication?
+- Are methods like `getEvents` or `getLatestEvent` useful for the channel wallet?
