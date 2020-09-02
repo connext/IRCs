@@ -13,17 +13,20 @@
 ## Overview
 
 Relevant contracts:
- - [`AssetHolder`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IAssetHolder.sol) (in practice this will be an `EthAssetHolder` or `ERC20AssetHolder` or something else that implements IAssetHolder)
- - [`ForceMove`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IForceMove.sol)
- - [`NitroAdjudicator`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/NitroAdjudicator.sol) (extends ForceMove)
+
+- [`AssetHolder`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IAssetHolder.sol) (in practice this will be an `EthAssetHolder` or `ERC20AssetHolder` or something else that implements IAssetHolder)
+- [`ForceMove`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/IForceMove.sol)
+- [`NitroAdjudicator`](https://github.com/statechannels/statechannels/blob/master/packages/nitro-protocol/contracts/interfaces/NitroAdjudicator.sol) (extends ForceMove)
 
 The onchain service is responsible for:
+
 - Monitoring events for those relevant to a given set of channels (this set of channels is determined at {create,run?}-time)
 - Pushing relevant event information into the channel wallet
 - Persisting event information to some long-term storage
 - Broadcasting onchain actions
 
 When calling contract methods:
+
 - the channel wallet will be the one who holds a key for the channel account, signs channel states, and encodes them into the eth transaction data field.
 - the onchain service will be the one who holds a key for an eth account with gas money(?)
 
@@ -86,7 +89,6 @@ event Deposited(
 
 - This event is emitted at the end of the `forceMove` function in `NitroAdjudicator.sol`. It provides all of the information needed for a channel participant to construct a new state when responding to a challenge. This event is emitted both on challenge creation, and challenge response if the participant is trying to play out the channel states onchain rather than resume offchain operations.
 
-
 ```typescript
 event ChallengeRegistered(
   bytes32 indexed channelId, // channelId to be adjudicated
@@ -111,6 +113,7 @@ event ChallengeCleared(
   uint48 turnNumRecord // a nonce supported by channel participants
 );
 ```
+
 #### `NitroAdjudicator` emits `Concluded`
 
 This event is emitted at the end of the `conclude` as well as the `concludePushOutcomeAndTransferAll` methods. Once the challenge has expired, the outcomes must be finalized before funds can be withdrawn, `concludePushOutcomeAndTransferAll` is a helper that executes the entire process in one transaction.
