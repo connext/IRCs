@@ -66,7 +66,7 @@ Some core features are still being worked on in the `server-wallet` and will nee
 
 - [ ] Support for ledger channel funding
 - [ ] Depositing into the channel
-- [ ] Defuning a channel on close
+- [ ] Defunding a channel on close
 - [ ] Top-ups + partial withdrawals
 - [ ] Support for virtual channels
 - [ ] Single ERC20 support
