@@ -188,6 +188,13 @@ export interface IOnchainService {
   );
 
   /**
+   * Removes all listeners from the service, and stops any ongoing operations.
+   * 
+   * @notice May be async, depending on final iterations
+   */
+  public stop(): void;
+
+  /**
    * @description Registers a channel for the onchain service to watch for.
    * @param channelId Unique channel identifier
    * @param assetHolders Asset holder contract addresses
