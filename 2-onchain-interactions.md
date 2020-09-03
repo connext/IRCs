@@ -45,7 +45,7 @@ To build iteratively, the implementation should be broken out into three phases:
 
 ### Service Architecture
 
-![alt text](https://github.com/connext/IRCs/blob/02-onchain-service/assets/IRC-2-architecture.png)
+![alt text](https://github.com/connext/IRCs/blob/master/assets/IRC-2-architecture.png)
 
 ### Contract Methods
 
