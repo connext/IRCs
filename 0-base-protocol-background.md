@@ -16,7 +16,7 @@ It is different in the following ways:
 2. The core protocol handles deposit/withdraw natively. //TODO How do channel topups and partial withdraws work?
 3. There are no more multisig contracts. Instead there's a global `assetHolder` contract per asset. //TODO How do we deposit directly to an address? How do we allow counterparty to pay for withdrawal?
 4. The StateChannels wallet does not handle message dispatching and responding directly. Instead, it uses a `pushMessage` pattern whereby the implementer pushes updates into the wallet (it also emits events to the application layer using `onNotification`). This dramatically simplifies adding middleware for encryption, message retries, caching, etc.
-5. The protocol extends turn based updating from being only an "app"-level feature to instead be throughout the protocol. This removes the need for distributed locks and, while it's still possible for states to get out of sync, makes recovery *very* easy.
+5. The protocol extends turn based updating from being only an "app"-level feature to instead be throughout the protocol. This removes the need for distributed locks and, while it's still possible for states to get out of sync, makes recovery _very_ easy.
 6. The application solidity code no longer defines a state machine but instead a simpler interface which just ensures that a given transition is valid. This means that calculating state transitions themselves is outside the scope of the wallet.
 7. The wallet is more tightly coupled with the store implementation and cannot easily be abstracted into a general interface with pluggable stores. This is because wallets are making use of transactions within the store itself (i.e. database transactions in the server-wallet) to serialize channel operations.
 8. For now, the wallet does not allow for an externally passed in signer. This is something that can be changed, however.
@@ -37,6 +37,7 @@ Dependency graph of StateChannels modules:
 ![alt text](https://github.com/connext/IRCs/blob/master/assets/IRC-0-SC-dependency.png?raw=true)
 
 Call flow:
+
 ```
       +--------------+                 +-----------------+
       | Payer Wallet |                 | Receiver Wallet |
@@ -52,6 +53,7 @@ Channel | |    | |               Channel | |    | |
       |              +<------7---------+                 |
       +--------------+                 +-----------------+
 ```
+
 Where clients are implemented by us.
 
 ## JSON RPC Interface
@@ -59,10 +61,12 @@ Where clients are implemented by us.
 A WIP specification of the JSON RPC interface [can be found here](https://github.com/connext/statechannels/blob/client-api-docs/packages/docs-website/docs/protocol-docs/client-specification/json-rpc-api.md). We can eventually move the WIP spec into this doc.
 
 ## Missing Features
+
 Some core features are still being worked on in the `server-wallet` and will need to be completed before a Connext node built on StateChannels could be properly run and tested. Aside from finalizing the above JSON RPC schema, these are (in rough order of priority):
+
 - [ ] Support for ledger channel funding
 - [ ] Depositing into the channel
-- [ ] Defuning a channel on close
+- [ ] Defunding a channel on close
 - [ ] Top-ups + partial withdrawals
 - [ ] Support for virtual channels
 - [ ] Single ERC20 support
