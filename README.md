@@ -15,19 +15,15 @@ This proposed iteration of Connext extends [State Channels](https://statechannel
 ### Core
 1. [IRC-0: Base Protocol Background](https://github.com/connext/IRCs/blob/master/0-base-protocol-background.md) - Background and JSON RPC Specification of StateChannels.
 2. [IRC-1: System Architecture](https://github.com/connext/IRCs/blob/master/1-system-architecture.md) - Architecture of Indra node and overview of modules.
+3. [IRC-2: Onchain Interactions](https://github.com/connext/IRCs/blob/master/2-onchain-interactions.md) - Read/write operations to/from a connected chain.
 
 ## Contributing
 New IRCs must be submitted via PR by taking an issue from the TODOs below.
 
 TODOs:
-- **IRC-2** -- Specification of Message-Router and messaging infra. Includes:
+- **IRC-3** -- Specification of Message-Router and messaging infra. Includes:
     - Key decisions around transport
     - Message-router interface
     - Auth/encryption strategy
     - Connection to lower level wallet interface
     - Specification of message retries and failure cases
-- **IRC-3** -- Specification of Chain Watching/Transaction infra. Includes:
-    - Interface to StateChannels
-    - Discussion of environment agnosticism
-    - Historical state vs current state of chain
-    - Working with existing infra that's out there? (Graph, Any.sender)
