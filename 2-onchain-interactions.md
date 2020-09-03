@@ -9,6 +9,9 @@
 - Does the browser wallet run a chain service? Or will the browser rely on an http server running a chain watcher?
 - Does retry-on-certain-errors really require any user-provided constructor args? Ideally we'll be able to make reasonable assumptions w/out requiring anything from the user (eg always retry if nonce error & never retry if insufficient funds).
 - What are the pros/cons of giving the onchain service a `registerChannel(channelId)` method vs providing a `channelId` in the constructor? Are there any cases where we'd want to start watching arbitrary channel ids after the onchain service has been created?
+- Should we have one `OnchainService` per chain or give `OnchainService` a set of providers keyed by chainId?
+- Should the `OnchainService` have a concept of a channel wallet? Or should it accept any channel through `registerChannel` and allow the application to handle service <--> wallet communication?
+- Are methods like `getEvents` or `getLatestEvent` useful for the channel wallet?
 
 ## Overview
 
@@ -28,9 +31,9 @@ The onchain service is responsible for:
 When calling contract methods:
 
 - the channel wallet will be the one who holds a key for the channel account, signs channel states, and encodes them into the eth transaction data field.
-- the onchain service will be the one who holds a key for an eth account with gas money(?)
+- the onchain service will be the one who holds a key for an eth account with gas money
 
-The channel wallet & onchain service keys {can,should} (not?) be the same key..?
+The channel wallet & onchain service keys can be the same key if it is funded for gas, but do not have to be.
 
 ### Implementation Details
 
@@ -53,7 +56,7 @@ Throughout the lifecycle of a channel there a few types of onchain interactions 
 - create a new dispute via `NitroAdjudicator.forceMove(...)`
 - respond to a dispute via `NitroAdjudicator.respond(...)` or `NitroAdjudicator.checkpoint(...)`
 - conclude a dispute via `NitroAdjudicator.conclude(...)`
-- Registry the results of a dispute on the asset holder via `NitroAdjudicator.pushOutcome(...)`
+- Register the results of a dispute on the asset holder via `NitroAdjudicator.pushOutcome(...)`
 - helpers: perform 2 of the above actions at once with methods like `pushOutcomeAndTransferAll` or `concludePushOutcomeAndTransferAll`
 - others..?
 
@@ -171,7 +174,7 @@ export interface TransactionSubmissionServiceInterface {
   ): Promise<providers.TransactionResponse>;
 }
 
-export interface IOnchainService {
+export interface OnchainServiceInterface {
   /**
    * @description Create a new onchain service and begin syncing according to given env
    * @param provider RPC Url or a JSON RPC Provider
@@ -189,10 +192,26 @@ export interface IOnchainService {
 
   /**
    * Removes all listeners from the service, and stops any ongoing operations.
-   * 
+   *
    * @notice May be async, depending on final iterations
    */
-  public stop(): void;
+  public attachHandler<T extends ContractEvent>(
+    assetHolderAddr: Address,
+    event: T,
+    callback: (event: ChannelEventRecordMap[T]) => void | Promise<void>,
+    filter?: (event: ChannelEventRecordMap[T]) => boolean,
+    timeout?: number
+  ): Evt<ChannelEventRecordMap[T]> | Promise<ChannelEventRecordMap[T]>;
+  
+  /**
+   * Detaches all handlers from the evt instance for the given asset holder
+   * and event (if provided)
+   * @param assetHolderAddr Contract address of Asset Holder
+   * @param event Event to remove handlers from
+   *
+   * @notice This may not be strictly necessary, but is useful for testing
+   */
+  public detachAllHandlers(assetHolderAddr: Address, event?: ContractEvent): void;
 
   /**
    * @description Registers a channel for the onchain service to watch for.
@@ -252,9 +271,3 @@ export interface IOnchainService {
   ): Promise<ChainEvent[]>;
 }
 ```
-
-## Questions
-
-- Should we have one `OnchainService` per chain or give `OnchainService` a set of providers keyed by chainId?
-- Should the `OnchainService` have a concept of a channel wallet? Or should it accept any channel through `registerChannel` and allow the application to handle service <--> wallet communication?
-- Are methods like `getEvents` or `getLatestEvent` useful for the channel wallet?
